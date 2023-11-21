@@ -1,0 +1,31 @@
+---
+title: "roxbury footprint mapping"
+output: html_document
+date: "2023-11-21"
+---
+```{r}
+source("libraries.R")
+```
+
+```{r}
+#Loading the thing
+
+library(openxlsx)
+
+
+df<-openxlsx::read.xlsx(xlsxFile  = "C:/Users/zlacovino/Documents/datasets/Columbus Corridor RFI Property Details KS 7-11-22.xlsx", sheet = 1)%>%
+  filter(Cluster %in% c("Cluster 2","Cluster 3", "Cluster 4", "Cluster 5"))%>%
+  mutate(Zip = paste0("0",Zip),
+         Full_Address = paste(Address, City, Zip))
+
+
+df_geoc<-df%>%geocode(Full_Address, method = "census")
+
+cc_map<-st_as_sf(df_geoc, coords = c("long", "lat"), crs = lat_lon_CRS)
+
+ggplot(cc_map)+
+  geom_sf(aes(color = Cluster))
+
+```
+
+
