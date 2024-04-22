@@ -1,0 +1,341 @@
+---
+title: "Statewide Digital Equity Plan: Digital Need and Demographic Analysis"
+output: html_notebook
+---
+
+
+
+```{r}
+#source("libraries.R")
+
+drv = dbDriver("PostgreSQL")
+ch.ds = dbConnect(drv, host='10.10.10.240', port='5432', dbname='ds', user='viewer', password=rstudioapi::askForPassword("Database password"))
+
+```
+
+# Digital Need
+
+For digital need: 
+
+    Est. Households without Internet (ACS Table S2801: Computers and Internet Subscriptions; Variable noint:) 
+
+    Est. Households without Computing Devices (ACS Table S2801: Computers and Internet Subscriptions; Variable nocmp:) 
+
+    Est. Households with only a Smartphone (ACS Table S2801: Computers and Internet Subscriptions; Variable moblo:) 
+
+## Pulling Data
+
+```{r}
+
+
+
+#variables 
+acs_year <- '2018-22' #this will update some but not all of the SQL scripts below
+
+
+digital_need_query <- paste0("SELECT ct20_id, noint, nointm, noint_p, noint_mp,
+                                nocmp, nocmpm, nocmp_p, nocmp_mp,
+                                moblo, moblom, moblo_p, moblo_mp
+                        FROM tabular.s2801_computer_internet_acs_ct
+                        WHERE acs_year = '", acs_year, "'")
+
+digital_need <- fetch(dbSendQuery(ch.ds, digital_need_query), n = -1)
+
+
+```
+
+## Min Max Digital Need and Scoring
+
+```{r}
+
+digital_need_mm<-digital_need%>%
+  #Select Just the estimates and percentages
+  select(ct20_id, noint, noint_p, nocmp, nocmp_p, moblo, moblo_p)%>% 
+  # Convert Percentages to Decimals and get rid of NAs
+  mutate(across(.cols = ends_with("_p"), function(x){ifelse(is.na(x), 0,
+                                                            round((x/100),2))}))%>%
+  #MinMax Normalization
+  mutate(across(.cols = where(is.numeric), function(x, na.rm = TRUE) {
+    return(round((x- min(x)) /(max(x)-min(x)),3))}))%>%
+  rename_with(~paste(., "mm", sep = "_"))%>%
+  rename(ct20_id = ct20_id_mm)
+
+digital_need_full<- full_join(digital_need, digital_need_mm)%>%
+  rowwise()%>%
+  mutate(dn_estimate_score = sum(noint_mm, nocmp_mm, moblo_mm)*2,
+         dn_percent_score = sum(noint_p_mm, nocmp_p_mm, moblo_p_mm)*2)
+
+# Some Visualizations
+
+ggplot(digital_need_full)+
+  geom_histogram(aes(dn_estimate_score))+
+  theme_clean()
+
+ggplot(digital_need_full)+
+  geom_point(aes(x = dn_estimate_score,
+                 y = dn_percent_score),
+             alpha = 0.5)+
+  geom_smooth(aes(x = dn_estimate_score,
+                 y = dn_percent_score))+
+  theme_clean()
+
+```
+
+# Population Alignment
+
+## Low-income individuals (Comprehensive Affordability Strategy (CHAS) Data Table: Household Income by Tenure; 
+    
+    Variable amiu80: Households with Inclusive Low Income (<=80% AMI)) 
+
+    DataCommon Link: https://datacommon.mapc.org/browser/datasets/340
+    
+    
+    Alternate
+    
+    b19001_hh_income_acs_ct
+    
+
+incu20
+incu20_me
+incu20_p
+incu20mep
+inc2039
+inc2039_me
+inc2039_p
+inc2039mep
+inc4059
+inc4059_me
+inc4059_p
+inc4059mep
+inc6074
+inc6074_me
+inc6074_p
+inc6074mep
+
+    
+```{r}
+
+#CHAS
+acs_year_chas <- '2016-20' 
+
+
+lih_query <- paste0("SELECT ct10_id, amiu80
+                        FROM tabular.hous_hh_income_by_tenure_chas_ct
+                        WHERE acs_year = '", acs_year_chas, "'")
+
+lih <- fetch(dbSendQuery(ch.ds, lih_query), n = -1)
+
+dbDisconnect(ch.ds)
+
+# ACS Household Income under 75k (50% Boston AMI (80% is $118,000))
+u75_query <- paste0("SELECT 
+                    ct20_id,
+                    incu20,incu20me,incu20_p,incu20mep,
+                    inc2039,inc2039me,inc2039_p,inc2039mep,
+                    inc4059,inc4059me,inc4059_p,inc4059mep,
+                    inc6074,inc6074me,inc6074_p,inc6074mep
+                      FROM tabular.b19001_hh_income_acs_ct
+                      WHERE acs_year = '", acs_year, "'")
+
+
+u75<- fetch(dbSendQuery(ch.ds, u75_query), n = -1)%>%
+  rowwise()%>%
+  mutate(hh_under75k = sum(incu20, inc2039, inc4059, inc6074),
+         hh_under75k_p = sum(incu20_p, inc2039_p, inc4059_p, inc6074_p)/100,
+         hh_under75kme = moe_sum(moe = c(incu20me, inc2039me, inc4059me, inc6074me),
+                             estimate = c(incu20, inc2039, inc4059, inc6074)))%>%
+  select(ct20_id, hh_under75k, hh_under75kme, hh_under75k_p)%>%
+  ungroup()
+
+#
+
+```
+
+## Older adults (ACS Table B01001: Population by Age and Gender; 
+
+    Variable popov65: Population 65 years and over) 
+
+    popov65m, pop65ovp, and pop65ovp. 
+
+    DataCommon Link: https://datacommon.mapc.org/browser/datasets/362   
+```{r}
+
+
+oa_query <- paste0("SELECT ct20_id, pop65ov, pop65ovm, pop65ovp, pop65ovmp
+                        FROM tabular.b01001_population_by_age_gender_acs_ct
+                        WHERE acs_year = '", acs_year, "'")
+
+oa <- fetch(dbSendQuery(ch.ds, oa_query), n = -1)%>%
+  mutate(pop65ovp = pop65ovp/100)
+
+```
+
+## Veterans (ACS Table S2101: Veteran Status; Variable Veterans) 
+
+    Veterans MOE, % Veterans, % Veterans MOE 
+
+    Data Link: https://data.census.gov/table?t=Veterans&g=040XX00US25$1400000
+
+Tidy Census
+    
+```{r}
+acs22<-load_variables(2022, "acs5", cache = FALSE)%>%
+  separate(label, into = paste0("label", 1:9), sep = "!!", fill = "right", remove = FALSE)
+
+vets<- get_acs(state = "MA", geography = "tract", 
+                   variables = c("B21001_001", "B21001_002"), 
+                   year = 2022)%>%
+      left_join(., acs22, by = c("variable" = "name"))%>%
+      select(GEOID, label3, estimate, moe)%>%
+      mutate(label3 = ifelse(is.na(label3), "Total_Pop", label3))%>%
+      pivot_wider(names_from = "label3",
+                  values_from = c("estimate", "moe"))%>%
+  mutate(vets_p = estimate_Veteran/estimate_Total_Pop,
+         vets_pm = moe_ratio(estimate_Veteran, estimate_Total_Pop,
+                        moe_Veteran, moe_Total_Pop))%>%
+  select(-c(estimate_Total_Pop, moe_Total_Pop))
+
+
+```
+
+
+## People living with disability (ACS Tables B18101 through B18107: Civilian Noninstitutionalized Population; Civilian Noninstitutionalized Population 5 Years And Over; Civilian Noninstitutionalized Population 18 Years And Over; 
+
+    Variable disab: Population with disability) 
+
+    disabm, disabp, and disabpm. 
+
+    DataCommon Link: https://datacommon.mapc.org/browser/datasets/98 
+    
+```{r}
+
+dis_query <- paste0("SELECT ct20_id, disab, disabm, disabp, disabmp
+                        FROM tabular.b18101_thru_b18107_disability_status_acs_ct
+                        WHERE acs_year = '", acs_year, "'")
+
+dis <- fetch(dbSendQuery(ch.ds, dis_query), n = -1)%>%
+  rename(disab_p = disabp,
+         diabb_pm = disabmp)%>%
+  mutate(disab_p = disab_p/100)
+
+```
+
+## People with limited English Language Proficiency - (ACS Table B16004: Language Spoken at Home with Ability to Speak English; 
+
+    Variable en_nw: People speaking another language and do not speak English well) 
+
+    en_nwme, en_nw_p, and en_nwmep 
+
+    Data Link: https://datacommon.mapc.org/browser/datasets/78
+    
+    ### Issue: This data is only up to 2021 on datacommon, ACS 2022 does not have this table quickly available in this format
+    
+    B06007_001
+    
+```{r}
+
+elp_query <- paste0("SELECT ct20_id, en_nw, en_nwme, en_nw_p, en_nwmep
+                        FROM tabular.b16004_home_language_english_ability_acs_ct
+                        WHERE acs_year = '", acs_year, "'")
+
+elp <- fetch(dbSendQuery(ch.ds, elp_query), n = -1)
+
+
+elp_tc<- get_acs(state = "MA", geography = "tract", 
+                   variables = c("B06007_001", "B06007_005", "B06007_008"), 
+                   year = 2022)%>%
+      left_join(., acs22, by = c("variable" = "name"))%>%
+      select(GEOID, label3, estimate, moe)%>%
+      mutate(label3 = ifelse(is.na(label3), "Total_Pop", label3))%>%
+      pivot_wider(names_from = "label3",
+                  values_from = c("estimate", "moe"))%>%
+  rowwise()%>%
+  mutate(en_nw = sum(`estimate_Speak Spanish:`, `estimate_Speak other languages:`),
+         en_nwme = moe_sum(moe = c(`moe_Speak Spanish:`, `moe_Speak other languages:`),
+                           estimate = en_nw),
+         en_nw_p = en_nw/estimate_Total_Pop,
+         en_nwmep = moe_ratio(en_nw, estimate_Total_Pop,
+                        en_nwme, moe_Total_Pop))%>%
+  ungroup()%>%
+  rename(ct20_id = GEOID)%>%
+  select(ct20_id, en_nw, en_nwme, en_nw_p, en_nwmep)
+
+
+
+```
+
+## Racial and Ethnic Minority Groups (ACS Table B03002: Race and Ethnicity Estimates; 
+
+    Variable nhwhi: Non-Hispanic White Alone [Used to calculate the population of color.]) 
+
+    nhwhi_me, totpop, totpop_me, nhwhi_p, and nhwhi_mep. 
+
+    DataCommon Link: https://datacommon.mapc.org/browser/datasets/5 
+```{r}
+
+poc_query <- paste0("SELECT ct20_id, nhwhi, nhwhi_me, totpop, totpop_me, nhwhi_p, nhwhi_mep
+                        FROM tabular.b03002_race_ethnicity_acs_ct
+                        WHERE acs_year = '", acs_year, "'")
+
+poc <- fetch(dbSendQuery(ch.ds, poc_query), n = -1)%>%
+  mutate(poc = totpop-nhwhi,
+         # poc_m = moe_sum(estimate = c(totpop, nhwhi),
+         #                 moe = c(totpop_me, nhwhi_me)),
+         poc_p = 1 - nhwhi_p/100)%>%
+  select(ct20_id, poc, poc_p)
+
+```
+
+## Min Max Population Alignment and Scoring
+
+```{r}
+
+pop_alignment<-left_join(u75, oa, by = "ct20_id")%>%
+  #lih%>%
+  left_join(vets, by =c("ct20_id"= "GEOID"))%>%
+  left_join(dis, by = "ct20_id")%>%
+  left_join(elp_tc, by = "ct20_id")%>%
+  #left_join(elp, by = "ct20_id")%>%
+  left_join(poc, by = "ct20_id")
+
+pop_alignment_mm<-pop_alignment%>%
+  #Select Just the estimates and percentages
+  select(ct20_id, hh_under75k, hh_under75k_p,
+         pop65ov, pop65ovp,
+         estimate_Veteran, vets_p,
+         disab, disab_p,
+         en_nw, en_nw_p,
+         poc, poc_p)%>% 
+  # Convert Percentages to Decimals and get rid of NAs
+  mutate(across(.cols = ends_with("p"), function(x){ifelse(is.na(x), 0,
+                                                            round(x,2))}))%>%
+  #MinMax Normalization
+  mutate(across(.cols = where(is.numeric), function(x, na.rm = TRUE) {
+    return(round((x- min(x)) /(max(x)-min(x)),3))}))%>%
+  rename_with(~paste(., "mm", sep = "_"))%>%
+  rename(ct20_id = ct20_id_mm)
+
+# Demographic Scoring
+
+pop_alignment_score<-full_join(pop_alignment, pop_alignment_mm, by = "ct20_id")%>%
+  rowwise()%>%
+  mutate(pop_estimate_score = sum(hh_under75k_mm, pop65ov_mm, estimate_Veteran_mm, disab_mm, en_nw_mm, poc_mm),
+         pop_percent_score = sum(hh_under75k_p_mm, pop65ovp_mm, vets_p_mm, disab_p_mm, en_nw_p_mm, poc_p_mm))
+  
+# Some Visualizations
+
+ggplot(pop_alignment_score)+
+  geom_histogram(aes(pop_estimate_score))+
+  theme_clean()
+
+ggplot(pop_alignment_score)+
+  geom_point(aes(x = pop_estimate_score,
+                 y = pop_percent_score),
+             alpha = 0.5)+
+  geom_smooth(aes(x = pop_estimate_score,
+                 y = pop_percent_score))+
+  theme_clean()
+  
+
+```
+
