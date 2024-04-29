@@ -3,13 +3,16 @@ title: "Statewide Digital Equity Plan: Digital Need and Demographic Analysis"
 output: html_notebook
 ---
 
-
+# Set up
 
 ```{r}
-#source("libraries.R")
+source("C:/Users/ziacovino/Desktop/digital-equity/libraries.R")
 
 drv = dbDriver("PostgreSQL")
 ch.ds = dbConnect(drv, host='10.10.10.240', port='5432', dbname='ds', user='viewer', password=rstudioapi::askForPassword("Database password"))
+
+acs22<-load_variables(2022, "acs5", cache = FALSE)%>%
+  separate(label, into = paste0("label", 1:9), sep = "!!", fill = "right", remove = FALSE)
 
 ```
 
@@ -125,7 +128,6 @@ lih_query <- paste0("SELECT ct10_id, amiu80
 
 lih <- fetch(dbSendQuery(ch.ds, lih_query), n = -1)
 
-dbDisconnect(ch.ds)
 
 # ACS Household Income under 75k (50% Boston AMI (80% is $118,000))
 u75_query <- paste0("SELECT 
@@ -179,8 +181,7 @@ oa <- fetch(dbSendQuery(ch.ds, oa_query), n = -1)%>%
 Tidy Census
     
 ```{r}
-acs22<-load_variables(2022, "acs5", cache = FALSE)%>%
-  separate(label, into = paste0("label", 1:9), sep = "!!", fill = "right", remove = FALSE)
+
 
 vets<- get_acs(state = "MA", geography = "tract", 
                    variables = c("B21001_001", "B21001_002"), 
@@ -338,4 +339,112 @@ ggplot(pop_alignment_score)+
   
 
 ```
+# Compiling Final Table
+
+Going with the estimate score:
+Because an apartment building will only ever likely be a small share of a census tract, focusing on the estimate of high digital need and vulnerable population will more likely capture the target population
+
+
+```{r}
+
+rpa_cw<- mapcdatakeys::rpa_data_keys%>%
+  select(muni_id, muni_name, rpa_name)%>%
+  mutate(muni_id = as.character(muni_id))
+# %>%
+#   group_by(muni_id, muni_name)%>%
+#   summarise()%>%
+#   ungroup()
+
+ct_muni_cw<- mapcdatakeys::crosswalk_geog(2020)%>%
+  select(ct20_id, muni_id)%>%
+  mutate(ct20_id = as.character(ct20_id),
+         muni_id = as.character(muni_id))%>%
+  full_join(., rpa_cw, by = "muni_id")%>%
+  distinct()%>%
+  group_by(ct20_id)%>%
+  summarise(muni_id = as.character(list(sort(muni_id))),
+            muni_name = as.character(list(sort(muni_name))),
+            rpa_name = as.character(list(unique(rpa_name))))%>%
+  mutate( muni_id = stringr::str_remove_all(muni_id, pattern = '[c("")]'),
+          muni_name = muni_name |> str_remove('c\\(') |> str_remove_all('\\)') |> str_remove_all('\"'))
+
+nchar(final_table$ct20_id[1])
+
+nchar(qualified_census_tracts$qct_id[1])
+
+final_table <- full_join(pop_alignment_score, digital_need_full, by = "ct20_id")%>%
+  full_join(., ct_muni_cw, by = "ct20_id")%>%
+  select(ct20_id, muni_id, muni_name, rpa_name,
+         hh_under75k, hh_under75kme, hh_under75k_mm,
+         pop65ov, pop65ovm, pop65ov_mm,
+         estimate_Veteran, moe_Veteran, estimate_Veteran_mm,
+         disab, disabm, disab_mm,
+         en_nw, en_nwme, en_nw_mm,
+         poc, poc_mm,
+         noint, nointm, noint_mm,
+         nocmp, nocmpm, nocmp_mm,
+         moblo, moblom, moblo_mm,
+         dn_estimate_score, pop_estimate_score)%>%
+  rowwise()%>%
+  mutate(total_score = sum(dn_estimate_score, pop_estimate_score))%>%
+  ungroup()%>%
+  mutate(dn_score_pr = rank(dn_estimate_score)/length(dn_estimate_score),
+         pa_score_pr = rank(pop_estimate_score)/length(pop_estimate_score),
+         total_score_mm = round((total_score - min(total_score))
+                                /(max(total_score)-min(total_score)),3),
+         total_score_pr = rank(total_score)/ length(total_score))%>%
+  full_join(., qualified_census_tracts, by = c("ct20_id" = "qct_id"))
+
+ggplot(final_table)+
+  geom_histogram(aes(total_score_pr))+
+  theme_clean()
+
+ggplot(final_table)+
+  geom_point(aes(x = total_score_pr,
+                 y = total_score_mm,
+                 color = factor(qct)),
+             alpha = 0.5
+             )+
+  # geom_smooth(aes(x = total_score_pr,
+  #                y = total_score_mm))+
+  theme_clean()
+
+ggplot(final_table)+
+  geom_point(aes(x = dn_estimate_score,
+                 y = pop_estimate_score,
+                 color = factor(qct)),
+             alpha = 0.5)+
+  # geom_smooth(aes(x = total_score_pr,
+  #                y = total_score_mm))+
+  theme_clean()
+
+write.csv(final_table, "C:/Users/ziacovino/OneDrive - Metropolitan Area Planning Council/Documents - Data Services/Digital Equity Planning/Statewide_Digital_Equity_Scores-and-Inputs.csv")
+
+```
+
+
+```{r}
+
+qualified_census_tracts<-rio::import("https://docs.huduser.gov/portal/datasets/qct/qct_data_2024.xlsx")%>%
+  filter(state == "25")%>%
+  select(qct_id, qct)%>%
+  mutate(qct_id = str_sub(qct_id, end = 11))
+
+
+```
+
+```{r}
+
+buildings<-st_read("K:/DataServices/Datasets/Housing/Multi_Family_Building_Locations/output/State_Subs_Public_Housing_GEOCODE_2024-04-24.shp")%>%
+  st_drop_geometry()%>%
+  mutate(ct20_id = as.character(ct20_id))
+
+
+write.csv(buildings, "K:/DataServices/Datasets/Housing/Multi_Family_Building_Locations/output/State_Subs_Public_Housing_GEOCODE_2024-04-24_wCT.csv")
+
+
+
+```
+
+
 
