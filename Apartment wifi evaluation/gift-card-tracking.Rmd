@@ -1,0 +1,134 @@
+---
+title: "gift-card-tracking"
+output: html_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+
+data_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Survey data pulls for gift card tracking/Qualtrics pulls"
+
+export_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Survey data pulls for gift card tracking/Processed lists"
+```
+
+Load newest survey exports
+- need to update file paths and variable names
+```{r message=FALSE}
+pre_survey_Apr3_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_March+27,+2026_14.10.csv"))
+
+post_survey_Apr3_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_March+27,+2026_14.36.csv")) 
+```
+
+Clean survey data
+- need to update variable names
+```{r}
+pre_survey <- pre_survey_Apr3_26 |> 
+  janitor::clean_names() |> 
+  slice(3:n()) |> 
+  select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
+
+post_survey <- post_survey_Apr3_26 |> 
+  janitor::clean_names() |> 
+  slice(3:n()) |> 
+  select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
+```
+
+
+# check for and remove duplicate responses
+```{r}
+unique_pre <- pre_survey |> 
+  mutate(unit_build = paste0(q88, q77, q89, sep = "_")) |> 
+  group_by(unit_build) |> 
+  mutate(response_count = n()) |> 
+  ungroup() |> 
+  distinct(unit_build, .keep_all = TRUE)
+
+unique_post <- post_survey |> 
+  mutate(unit_build = paste0(q88, q77, q89, sep = "_")) |> 
+  group_by(unit_build) |> 
+  mutate(response_count = n()) |> 
+  ungroup() |> 
+  distinct(unit_build, .keep_all = TRUE)
+```
+
+# filter results
+```{r}
+#Pre-survey
+#filtering out unfinished responses and responses before previous download date
+pre_survey_review <- unique_pre |> 
+  filter(finished == "True") |> 
+  mutate(recorded = recorded_date,
+         recorded_date = date(recorded)) |> 
+  filter(recorded_date > ymd("2026-03-27")) |> 
+  rowwise() |> 
+  # field to count skipped questions
+  mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
+  # removing responses where 15 or more questions were skipped
+  filter(skipped <= 15)
+ 
+pre_survey_skipped <-  unique_pre |> 
+  mutate(recorded = recorded_date,
+         recorded_date = date(recorded)) |> 
+  filter(recorded_date > ymd("2026-03-27")) |> 
+  rowwise() |> 
+  mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
+  filter(skipped > 15 | finished == "False")
+
+#Post-survey
+#filtering out unfinished responses and responses before previous download date
+post_survey_review <- unique_post |> 
+  filter(finished == "True") |> 
+  filter(q77 != "I don't live in any of these buildings") |> 
+  mutate(recorded = recorded_date,
+         recorded_date = date(recorded)) |> 
+  filter(recorded_date > ymd("2026-03-27")) |> 
+  rowwise() |> 
+  # field to count skipped questions
+  mutate(skipped = sum(c_across(19:59) == -99, na.rm = TRUE)) |> 
+  # removing responses where 15 or more questions were skipped
+  filter(skipped < 15)
+ 
+post_survey_skipped <- unique_post |> 
+  mutate(recorded = recorded_date,
+         recorded_date = date(recorded)) |> 
+#  filter(recorded_date > ymd("2026-03-27")) |> 
+  rowwise() |> 
+  mutate(skipped = sum(c_across(19:59) == -99, na.rm = TRUE)) |> 
+  filter(skipped >= 15 | finished == "False")
+
+#rm(pre_survey_skipped, post_survey_skipped)
+```
+Note: qualtrics offers a download option where all questions that a respondent was shown but did not answer are coded as -99. The above code chunk uses that to identify responses where respondents did not respond to many questions and filter those users out as incomplete survey responses.
+- currently the limit is set to 15 as that seemed to be the threshold between results that were nearly entirely incomplete and those where the respondent filled out most of the survey but maybe missed some of the categories on the ranking questions or didn't share complete demographic data.
+
+# export of respondents who should receive gift cards
+- need to update file name
+```{r}
+gc_pre <- pre_survey_review |> 
+  rename(phone = q89, unit = q88, building = q77, gc_type = q97) |> 
+  mutate(first = "", last = "", address = "", email = "", survey = "pre-survey") |> 
+  select(response_id, recorded_date, phone, unit, building, first, last,  address, email, survey, gc_type)
+
+gc_post <- post_survey_review |> 
+  rename(phone = q89, unit = q88, building = q77, gc_type = q101) |> 
+  mutate(first = "", last = "", address = "", email = "", survey = "post-survey") |> 
+  select(response_id, recorded_date, phone, unit, building, first, last,  address, email, survey, gc_type)
+
+gc_export <- rbind(gc_pre, gc_post) 
+
+#write.csv(gc_export, file.path(export_path, "Mar28_Apr3_recipients.csv"))
+write.csv(gc_export, file.path(export_path, "beginning_to_Mar27_recipients.csv"))
+```
+#manually deleted a test result from Parsa (R_7wpGqLUgrZI9HvH) in Excel after export
+
+
+#pulling extra info from early surveys
+```{r}
+pre_survey_test <- read_csv(file.path(data_path, "test download.csv"))
+
+pre_survey_test |> 
+  filter(ResponseId %in% gc_export$response_id) |> 
+  select(ResponseId, Q94, Q98_1, Q99_1, Q99_2, Q99_3) |> 
+  view()
+```
+
