@@ -14,20 +14,20 @@ export_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/D
 Load newest survey exports
 - need to update file paths and variable names
 ```{r message=FALSE}
-pre_survey_Apr3_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_March+27,+2026_14.10.csv"))
+pre_survey_Apr10_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_April+10,+2026_15.05.csv"))
 
-post_survey_Apr3_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_March+27,+2026_14.36.csv")) 
+post_survey_Apr10_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_April+10,+2026_15.08.csv")) 
 ```
 
 Clean survey data
 - need to update variable names
 ```{r}
-pre_survey <- pre_survey_Apr3_26 |> 
+pre_survey <- pre_survey_Apr10_26 |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
 
-post_survey <- post_survey_Apr3_26 |> 
+post_survey <- post_survey_Apr10_26 |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
@@ -59,7 +59,7 @@ pre_survey_review <- unique_pre |>
   filter(finished == "True") |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date > ymd("2026-03-27")) |> 
+  filter(recorded_date >= ymd("2026-04-03")) |> 
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
@@ -69,7 +69,7 @@ pre_survey_review <- unique_pre |>
 pre_survey_skipped <-  unique_pre |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date > ymd("2026-03-27")) |> 
+  filter(recorded_date < ymd("2026-03-27")) |> 
   rowwise() |> 
   mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
   filter(skipped > 15 | finished == "False")
@@ -81,7 +81,7 @@ post_survey_review <- unique_post |>
   filter(q77 != "I don't live in any of these buildings") |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date > ymd("2026-03-27")) |> 
+  filter(recorded_date >= ymd("2026-04-03")) |> 
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(19:59) == -99, na.rm = TRUE)) |> 
@@ -117,7 +117,7 @@ gc_post <- post_survey_review |>
 gc_export <- rbind(gc_pre, gc_post) 
 
 #write.csv(gc_export, file.path(export_path, "Mar28_Apr3_recipients.csv"))
-write.csv(gc_export, file.path(export_path, "beginning_to_Mar27_recipients.csv"))
+write.csv(gc_export, file.path(export_path, "Apr3_to_Apr10_recipients.csv"))
 ```
 #manually deleted a test result from Parsa (R_7wpGqLUgrZI9HvH) in Excel after export
 
