@@ -1,0 +1,31 @@
+---
+title: "building-demographics"
+output: html_document
+---
+
+Notes:
+- ctrl + alt + i creates a new code chunk
+- ctrl + enter lets you run a single line of code
+- ?function_name() opens a help window with the function documentation
+- R can only read file paths with / not \
+
+# Library load
+```{r}
+library(tidyverse)
+
+source("C:/GitHub/digital-equity/libraries.R")
+```
+
+# Data load
+```{r}
+building_addresses <- read_csv("C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/AWF Sites Clean Addresses_May2026_clean.csv")
+
+demographic_bg <- read_csv("https://staging.datacommon-react.mapc.org/api/export?token=datacommon&database=ds&schema=tabular&table=b03002_race_ethnicity_acs_bg&format=csv&years=2020-24&useMetadataColumns=false")
+  
+demographic_ct <- 
+```
+
+# analysis
+```{r}
+
+```
