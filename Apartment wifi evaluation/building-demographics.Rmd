@@ -14,7 +14,7 @@ Notes:
 ```{r}
 library(tidyverse)
 
-source("C:/digital-equity/libraries.R")
+source("C:/GitHub/digital-equity/libraries.R")
 ```
 
 # Data load
@@ -36,11 +36,13 @@ bld_add_clean <- building_addresses |>
   )
 
 # select relevant data columns, 2020 geography
-demo_bg_clean <- 
+demo_bg_clean <-demographic_bg %>% 
+  select(bg20_id,totpop,nhwhi,nhaa,nhoth,lat,totpop_me,nhwhi_me,nhaa_me,nhoth_me,lat_me)
   
-  
-demo_ct_clean <-
-  
+demo_ct_clean <-demographic_ct %>% 
+  select(ct20_id,totpop,nhwhi,nhaa,nhoth,lat,totpop_me,nhwhi_me,nhaa_me,nhoth_me,lat_me)
+
+
   
   
   
@@ -48,6 +50,27 @@ demo_ct_clean <-
 
 # analysis
 ```{r}
+buildings_geo <- bld_add_clean %>% 
+  geocode(full_address, method = 'arcgis', lat = lat, long = long)
 
+buildings_points <- buildings_geo %>% 
+  st_as_sf(coords = c('long', 'lat'),
+             crs = st_crs(lat_lon_CRS),
+             remove = FALSE)
+
+ct_shape <- mapcdatakeys::tract_sf(2020)
+  
+  
+  
+buildings_join <- buildings_points |> 
+    #setting crs to match polygon shapefile
+    st_transform(mass_mainland, crs = st_crs(ct_shape)) |> 
+    #polygon_field can be one field you want to add or a list of fields
+    st_join(select(ct_shape, ct20_id, geometry)) 
+  
+buildings_final <- buildings_join %>% 
+  mutate(ct20_id=as.double(ct20_id)) %>% 
+  left_join(demo_ct_clean,by='ct20_id')
 ```
+
 

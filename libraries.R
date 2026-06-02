@@ -14,9 +14,9 @@ library(openxlsx)
 library(data.table)
 
 #Spatial
-library(arcgisbinding)
-arc.check_product()
-arc.check_portal()
+#library(arcgisbinding)
+#arc.check_product()
+#arc.check_portal()
 library(tidygeocoder)
 library(nngeo)
 
