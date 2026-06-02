@@ -14,16 +14,16 @@ Notes:
 ```{r}
 library(tidyverse)
 
-source("C:/GitHub/digital-equity/libraries.R")
+source("C:/digital-equity/libraries.R")
 ```
 
 # Data load
 ```{r}
-building_addresses <- read_csv("C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/AWF Sites Clean Addresses_May2026_clean.csv", col_types = "ciciccccc")
+building_addresses <- read_csv("C:/Users/aalmanzar/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/AWF Sites Clean Addresses_May2026_clean.csv", col_types = "ciciccccc")
 
 demographic_bg <- read_csv("https://staging.datacommon-react.mapc.org/api/export?token=datacommon&database=ds&schema=tabular&table=b03002_race_ethnicity_acs_bg&format=csv&years=2020-24&useMetadataColumns=false")
   
-demographic_ct <- 
+demographic_ct <- read_csv('https://datacommon.mapc.org/api/export?token=datacommon&database=ds&schema=tabular&table=b03002_race_ethnicity_acs_ct&format=csv&years=2020-24&useMetadataColumns=false')
 ```
 
 # data cleanup
@@ -39,7 +39,11 @@ bld_add_clean <- building_addresses |>
 demo_bg_clean <- 
   
   
-demo_ct_clean <- 
+demo_ct_clean <-
+  
+  
+  
+  
 ```
 
 # analysis
