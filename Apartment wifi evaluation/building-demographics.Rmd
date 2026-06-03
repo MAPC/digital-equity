@@ -11,20 +11,23 @@ Notes:
 - ctrl + shift + m for the pipe operator
 
 # Library load
-```{r}
+```{r, warning=FALSE}
 library(tidyverse)
 
 source("C:/GitHub/digital-equity/libraries.R")
-datapath <- "C:/Users/aalmanzar/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Demographic analysis/"
 
+#pulls username from computer and makes it a variable
+user <- Sys.getenv("USERNAME")
+
+datapath <- paste0("C:/Users/", user, "/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Demographic analysis/")
 
 ```
 
 # Data load
-```{r}
-building_addresses <- readxl::read_xlsx(paste0(datapath,"AWF Sites Clean Addresses_May2026_clean.xlsx"), #col_types = "ciciccccc", 
-                                        n_max = 50, trim_ws = TRUE)
-HUD <- read_csv(paste0(datapath,'HUD_MA_Projects_2025.csv'))
+```{r, warning=FALSE}
+building_addresses <- readxl::read_xlsx(paste0(datapath,"AWF Sites Clean Addresses_May2026_clean.xlsx"), n_max = 50, trim_ws = TRUE)
+
+HUD <- read_csv(paste0(datapath,'Archive/HUD_MA_Projects_2025.csv'))
 
 demographic_bg <- read_csv("https://staging.datacommon-react.mapc.org/api/export?token=datacommon&database=ds&schema=tabular&table=b03002_race_ethnicity_acs_bg&format=csv&years=2020-24&useMetadataColumns=false")
   
@@ -42,62 +45,77 @@ bld_add_clean <- building_addresses |>
 
 # select relevant data columns, 2020 geography
 demo_bg_clean <-demographic_bg %>% 
-  select(bg20_id,totpop,nhwhi,nhaa,nhoth,lat,totpop_me,nhwhi_me,nhaa_me,nhoth_me,lat_me)
+  select(bg20_id, totpop, totpop_me, nhwhi, nhwhi_me, nhaa, nhaa_me, nhoth, nhoth_me, lat, lat_me, nhwhi_p, nhwhi_mep, nhaa_p, nhaa_mep, nhoth_p, nhoth_mep, lat_p, lat_mep)
   
 demo_ct_clean <-demographic_ct %>% 
-  select(ct20_id,totpop,nhwhi,nhaa,nhoth,lat,totpop_me,nhwhi_me,nhaa_me,nhoth_me,lat_me)
+  select(ct20_id, totpop, totpop_me, nhwhi, nhwhi_me, nhaa, nhaa_me, nhoth, nhoth_me, lat, lat_me, nhwhi_p, nhwhi_mep, nhaa_p, nhaa_mep, nhoth_p, nhoth_mep, lat_p, lat_mep)
 
-
-  
-  
-  
+# rename census tract and block group fields to differentiate
+colnames(demo_ct_clean)[c(2:19)] <- paste(colnames(demo_ct_clean)[c(2:19)], "ct", sep = "_")
+colnames(demo_bg_clean)[c(2:19)] <- paste(colnames(demo_bg_clean)[c(2:19)], "bg", sep = "_")
 ```
 
 # analysis
 ```{r}
+# get latitudes and longitudes based on address
 buildings_geo <- bld_add_clean %>% 
-  geocode(full_address, method = 'arcgis', lat = lat, long = long)
+  geocode(full_address, method = 'arcgis', lat = latitude, long = long)
 
+# make the data spatial
 buildings_points <- buildings_geo %>% 
-  st_as_sf(coords = c('long', 'lat'),
+  st_as_sf(coords = c('long', 'latitude'),
              crs = st_crs(lat_lon_CRS),
              remove = FALSE)
 
+# load spatial polygons for census geographies
 ct_shape <- mapcdatakeys::tract_sf(2020)
 
 bg_shape <- mapcdatakeys::blockgroup_sf(2020)
-  
-  
-  
-buildings_join <- buildings_points |> 
+
+# join building points to census tract shape  
+buildings_join_ct <- buildings_points |> 
     #setting crs to match polygon shapefile
     st_transform(mass_mainland, crs = st_crs(ct_shape)) |> 
     #polygon_field can be one field you want to add or a list of fields
     st_join(select(ct_shape, ct20_id, geometry)) 
-  
-buildings_final <- buildings_join %>% 
+
+# join building data to census tract demographic data
+buildings_final_ct <- buildings_join_ct %>% 
   mutate(ct20_id=as.double(ct20_id)) %>% 
   left_join(demo_ct_clean,by='ct20_id') %>% 
   st_drop_geometry()
 
+# join building points to block group shape  
 buildings_join_bg <- buildings_points |> 
     #setting crs to match polygon shapefile
     st_transform(mass_mainland, crs = st_crs(bg_shape)) |> 
     #polygon_field can be one field you want to add or a list of fields
     st_join(select(bg_shape, bg20_id, geometry)) 
-  
+
+# join building points to block group data
 buildings_final_bg <- buildings_join_bg %>% 
   mutate(bg20_id=as.double(bg20_id)) %>% 
   left_join(demo_bg_clean,by='bg20_id') %>% 
   st_drop_geometry()
 
+# join ct and bg data and remove unneeded columnns
+buildings_final <- buildings_final_bg |> 
+  select(-c(street_number, street, state, zip, full_address, latitude, long)) |> 
+  left_join(buildings_final_ct, by = "site_name") |> 
+  select(-c(unit_count.y, municipality.y, hp.y, street_number, street, state, zip, full_address, latitude, long))
+
 ```
 
 #Write Final Data
 ```{r}
-write.csv(buildings_final,paste0(datapath,"buildingsct.csv"))
+#write census tract table
+#write.csv(buildings_final_ct,paste0(datapath,"buildingsct.csv"))
 
-write.csv(buildings_final_bg,paste0(datapath,"buildingsbg.csv"))
+#write bg table
+#write.csv(buildings_final_bg,paste0(datapath,"buildingsbg.csv"))
+
+#write joined bg/ct tables
+write.xlsx(buildings_final, paste0(datapath, "census_demographics_all.xlsx"))
 ```
 
 
