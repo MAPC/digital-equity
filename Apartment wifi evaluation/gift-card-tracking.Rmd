@@ -116,9 +116,17 @@ gc_post <- post_survey_review |>
 
 gc_export <- rbind(gc_pre, gc_post) 
 
-#write.csv(gc_export, file.path(export_path, "Mar28_Apr3_recipients.csv"))
-write.csv(gc_export, file.path(export_path, "Apr24_to_May12_recipients.csv"))
 ```
+
+
+```{r}
+
+#write.csv(gc_export, file.path(export_path, "Mar28_Apr3_recipients.csv"))
+#write.csv(gc_export, file.path(export_path, "Apr24_to_May12_recipients.csv"))
+#write.csv(gc_export, file.path(export_path, "May12_to_June6_recipients.csv"))
+```
+
+
 #manually deleted a test result from Parsa (R_7wpGqLUgrZI9HvH) in Excel after export
 
 
