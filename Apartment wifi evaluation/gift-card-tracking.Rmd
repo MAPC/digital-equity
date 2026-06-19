@@ -14,20 +14,20 @@ export_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/D
 Load newest survey exports
 - need to update file paths and variable names
 ```{r message=FALSE}
-pre_survey_May12_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_May+12,+2026_10.24.csv"))
+pre_survey_June19_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_June+19,+2026_13.21.csv"))
 
-post_survey_May12_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_May+12,+2026_10.25.csv")) 
+post_survey_June19_26 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_June+19,+2026_13.22.csv")) 
 ```
 
 Clean survey data
 - need to update variable names
 ```{r}
-pre_survey <- pre_survey_May12_26 |> 
+pre_survey <- pre_survey_June19_26 |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
 
-post_survey <- post_survey_May12_26 |> 
+post_survey <- post_survey_June19_26 |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
@@ -59,7 +59,7 @@ pre_survey_review <- unique_pre |>
   filter(finished == "True") |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date >= ymd("2026-04-24")) |> 
+  filter(recorded_date >= ymd("2026-06-06")) |> 
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
@@ -81,7 +81,7 @@ post_survey_review <- unique_post |>
   filter(q77 != "I don't live in any of these buildings") |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date >= ymd("2026-04-24")) |> 
+  filter(recorded_date >= ymd("2026-06-06")) |> 
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(19:59) == -99, na.rm = TRUE)) |> 
@@ -124,6 +124,7 @@ gc_export <- rbind(gc_pre, gc_post)
 #write.csv(gc_export, file.path(export_path, "Mar28_Apr3_recipients.csv"))
 #write.csv(gc_export, file.path(export_path, "Apr24_to_May12_recipients.csv"))
 #write.csv(gc_export, file.path(export_path, "May12_to_June6_recipients.csv"))
+write.csv(gc_export, file.path(export_path, "June6_to_June19_recipients.csv"))
 ```
 
 
