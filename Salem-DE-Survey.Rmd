@@ -1,0 +1,43 @@
+---
+title: "Salem-DE-Survey"
+output: html_document
+---
+#Data load
+```{r}
+library(tidyverse)
+
+survey_raw <- read_csv("C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - MBI Digital Equity Planning/Salem/03_Community Engagement/7. Survey/Salem+Digital+Equity_July+31,+2026_15.13.csv")
+```
+
+#Data cleaning
+```{r}
+survey_clean <- survey_raw |> 
+  slice(3:n()) |> 
+  janitor::clean_names() |> 
+  select(response_id, user_language, q11, q15, q61, race, race_7_text, q56, q80, q35)
+```
+q11: Hard to pay internet bill?
+q15: Device
+q61: How comfortable are you currently with learning new internet skills?
+q56: Do you identify as Middle Eastern or North African?
+q80: how do you identify
+q35: income
+
+#Crosstab
+- who is struggling with these different buckets of issues - is it the same people struggling with all three or spread out 
+-- internet bill "very hard" to pay; "often" "always" not enough devices; "somewhat uncomfortable" "uncomfortable" learning new skills
+-- demographics: income, maybe race/ethnicity
+
+```{r}
+crosstab <- survey_clean |> 
+  mutate(flag = ifelse((q11 == "Very Hard" | q11 == "Somewhat hard") & (q15 == "Always" | q15 == "Often") & (q61 == "Uncomfortable" | q61 == "Somewhat uncomfortable"), 1, 0)
+         ) |> 
+  group_by(flag, q35) |> 
+  summarize(count = n())
+
+test <- survey_clean |> 
+  filter(q11 == "Very Hard" | q11 == "Somewhat hard") |>  #397 --> 106 
+ # filter(q15 == "Always" | q15 == "Often") |>  #106 --> 10
+  filter(q61 == "Uncomfortable" | q61 == "Somewhat uncomfortable") #0
+```
+
