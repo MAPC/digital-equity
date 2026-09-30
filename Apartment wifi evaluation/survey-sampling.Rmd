@@ -1,0 +1,86 @@
+---
+title: "survey-sampling"
+output: html_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(tidyverse)
+
+data_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Survey data pulls for gift card tracking/Qualtrics pulls"
+
+export_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Demographic analysis/Survey counts by race and building
+```
+
+Load newest survey exports
+- need to update file paths and variable names
+```{r message=FALSE}
+pre_survey <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_September+28,+2026_11.21.csv"))
+
+post_survey <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_September+28,+2026_11.22.csv")) 
+```
+
+Clean survey data
+```{r}
+pre_survey_clean <- pre_survey |> 
+  janitor::clean_names() |> 
+  slice(3:n()) |> 
+  select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
+
+post_survey_clean <- post_survey |> 
+  janitor::clean_names() |> 
+  slice(3:n()) |> 
+  select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
+
+rm(pre_survey, post_survey)
+```
+
+
+```{r}
+unique_pre <- pre_survey_clean |> 
+  mutate(unit_build = paste0(q88, q77, q89, sep = "_")) |> 
+  group_by(unit_build) |> 
+  mutate(response_count = n()) |> 
+  ungroup() |> 
+  distinct(unit_build, .keep_all = TRUE)
+
+unique_post <- post_survey_clean |> 
+  mutate(unit_build = paste0(q88, q77, q89, sep = "_")) |> 
+  group_by(unit_build) |> 
+  mutate(response_count = n()) |> 
+  ungroup() |> 
+  distinct(unit_build, .keep_all = TRUE)
+```
+
+Building split
+```{r}
+building_count_pre <- unique_pre |> count(q77) |> 
+  rename(pre_surveys = n)
+
+building_count_post <- unique_post |> count(q77) |> 
+  rename(post_surveys = n)
+
+building_counts <- full_join(building_count_pre, building_count_post, by = 'q77')
+gc(building_count_pre, building_count_post)
+```
+
+Building + race split
+```{r}
+race_count_pre <- unique_pre |> 
+  count(q33) |> 
+  rename(pre_surveys = n)
+
+race_count_post <- unique_post |> 
+  count(q33) |> 
+  rename(post_surveys = n)
+
+race_counts <- full_join(race_count_pre, race_count_post, by = 'q33')
+rm(race_count_pre, race_count_post)
+```
+
+#Export
+```{r}
+setwd(export_path)
+write.csv(building_counts, "building_counts.csv")
+write.csv(race_counts, "race_counts.csv")
+```
+
