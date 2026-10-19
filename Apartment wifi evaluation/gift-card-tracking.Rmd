@@ -5,6 +5,7 @@ output: html_document
 
 ```{r warning=FALSE, message=FALSE}
 library(tidyverse)
+#need to update user name in path
 
 data_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Resident Engagement Release Forms/Survey data pulls for gift card tracking/Qualtrics pulls"
 
@@ -14,20 +15,20 @@ export_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/D
 Load newest survey exports
 - need to update file paths and variable names
 ```{r message=FALSE}
-pre_survey_Aug24_Sept28 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_September+28,+2026_11.21.csv"))
+pre_survey_raw <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Pre-Survey_October+19,+2026_16.07.csv"))
 
-post_survey_Aug24_Sept28 <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_September+28,+2026_11.22.csv")) 
+post_survey_raw <- read_csv(file.path(data_path, "Apartment+Wifi+Evaluation+Post-Survey_October+19,+2026_16.08.csv")) 
 ```
 
 Clean survey data
 - need to update variable names
 ```{r}
-pre_survey <- pre_survey_Aug24_Sept28 |> 
+pre_survey <- pre_survey_raw |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
 
-post_survey <- post_survey_Aug24_Sept28 |> 
+post_survey <- post_survey_raw |> 
   janitor::clean_names() |> 
   slice(3:n()) |> 
   select(-c(start_date, end_date, status, recipient_last_name, recipient_first_name, recipient_email, external_reference, location_latitude, location_longitude, distribution_channel))
@@ -51,6 +52,8 @@ unique_post <- post_survey |>
   distinct(unit_build, .keep_all = TRUE)
 ```
 
+
+Update this section!!
 # filter results
 ```{r}
 #Pre-survey
@@ -59,7 +62,7 @@ pre_survey_review <- unique_pre |>
   filter(finished == "True") |> 
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date >= ymd("2026-08-24")) |> 
+  filter(recorded_date >= ymd("2026-09-28")) |> #update to previous survey pull date
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(9:49) == -99, na.rm = TRUE)) |> 
@@ -78,10 +81,10 @@ pre_survey_review <- unique_pre |>
 #filtering out unfinished responses and responses before previous download date
 post_survey_review <- unique_post |> 
   filter(finished == "True") |> 
-  filter(q77 != "I don't live in any of these buildings") |> 
+  filter(q77 != "I don't live in any of these buildings") |> # update to previous survey pull date
   mutate(recorded = recorded_date,
          recorded_date = date(recorded)) |> 
-  filter(recorded_date >= ymd("2026-08-24")) |> 
+  filter(recorded_date >= ymd("2026-09-28")) |> 
   rowwise() |> 
   # field to count skipped questions
   mutate(skipped = sum(c_across(19:59) == -99, na.rm = TRUE)) |> 
@@ -125,7 +128,7 @@ gc_export <- rbind(gc_pre, gc_post)
 #write.csv(gc_export, file.path(export_path, "Apr24_to_May12_recipients.csv"))
 #write.csv(gc_export, file.path(export_path, "May12_to_June6_recipients.csv"))
 #write.csv(gc_export, file.path(export_path, "June6_to_June19_recipients.csv"))
-write.csv(gc_export, file.path(export_path, "August24_to_Sept28_recipients.csv"))
+write.csv(gc_export, file.path(export_path, "Sept28_to_October19_recipients.csv")) # update name
 ```
 
 
