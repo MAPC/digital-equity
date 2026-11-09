@@ -2,18 +2,83 @@
 title: "network-data"
 output: html_document
 ---
-
+#Data paths
 ```{r, warning=FALSE}
 library(tidyverse)
 
-data_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Program Evaluation Research/Data Collection Phase 2/Network Data/raw"
+data_path <- file.path("C:/Users", Sys.getenv("USERNAME"), "OneDrive - Metropolitan Area Planning Council/Digital Equity - Program Evaluation Research/Data Collection Phase 2/Network Data/raw")
 
 output_path <- "C:/Users/aderosa/OneDrive - Metropolitan Area Planning Council/Digital Equity - Program Evaluation Research/Data Collection Phase 2/Network Data/processed"
 ```
 
-```{r, warning=FALSE}
-rapidtec_test <- read_csv(file.path(data_path, "SHA-Properzi_Feb-23--2026_Feb-26--2026_comma.csv"))
+#Make repeatable per building
+```{r}
+#create variable for building and change only this before run
+building <- "properzi"
+housing_authority <- "SHA"
+  
+#options: Properzi, Weston
 
-write.csv(save, file.path(output_path, "SHA_toreview.csv"))
+#Housing authority
+SHA <- c("properzi", "weston")
+NAHA <- c("ashland spring", "greylock", "riverview")
+```
+
+#Load data
+```{r, warning=FALSE}
+#rapidtec_test <- read_csv(file.path(data_path, "SHA-Properzi_Feb-23--2026_Feb-26--2026_comma.csv"))
+
+# Rapidtech data
+## SHA buildings
+properzi_raw <- read_csv(file.path(data_path,
+                                   "SHA/SHA_Properzi/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+weston_raw <- read_csv(file.path(data_path,
+                                   "SHA/SHA_Weston/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+## NAHA buildings
+ashland <- read_csv(file.path(data_path, 
+                              "NAHA/NAHA_Ashland_Spring/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+
+greylock <- read_csv(file.path(data_path, 
+                               "NAHA/NAHA_Greylock/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+
+riverview <- read_csv(file.path(data_path, 
+                                "NAHA/NAHA_Riverview/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+```
+
+# Number + % of units using free wifi
+- # of units that have ever connected
+  - rapid_tech has this since launch date in "active_vlan_summary" (active + configured)
+- monthly usage trends, any trends from launch date on
+```{r}
+
+```
+
+# Number of devices per VLAN
+- monthly average, median, max
+- peak?
+- Rapidtech "_device_summary" file has building totals by device type
+```{r}
+
+```
+
+#Device Types
+```{r}
+
+```
+
+---- Below is exploration beyond logframe requirements ------
+# Day/time variations
+- are there busier hours of the day?
+- are there busier days of the week? 
+- _daily_summary from rapidtech has sessions, unique clients, and session traffic in gb
+
+```{r}
+
+```
+
+# Usage purpose
+- rapidtech  _application_usage has use by site with unique users and received and transmitted gb
+```{r}
+
 ```
 
