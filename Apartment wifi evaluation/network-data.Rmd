@@ -5,6 +5,8 @@ output: html_document
 #Data paths
 ```{r, warning=FALSE}
 library(tidyverse)
+library(lubridate)
+options(digits = 3)
 
 data_path <- file.path("C:/Users", Sys.getenv("USERNAME"), "OneDrive - Metropolitan Area Planning Council/Digital Equity - Program Evaluation Research/Data Collection Phase 2/Network Data/raw")
 
@@ -25,33 +27,115 @@ NAHA <- c("ashland spring", "greylock", "riverview")
 ```
 
 #Load data
-```{r, warning=FALSE}
+```{r, warning=FALSE, message=FALSE}
 #rapidtec_test <- read_csv(file.path(data_path, "SHA-Properzi_Feb-23--2026_Feb-26--2026_comma.csv"))
 
 # Rapidtech data
 ## SHA buildings
 properzi_raw <- read_csv(file.path(data_path,
-                                   "SHA/SHA_Properzi/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+                                   "SHA/SHA_Properzi/csv/2026-07-18_to_2026-10-15_sessions.csv")) |> 
+  mutate(
+    month = lubridate::month(session_start),
+    building = "Properzi"
+  ) |> 
+  select(building, month, everything())
+
 weston_raw <- read_csv(file.path(data_path,
-                                   "SHA/SHA_Weston/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+                                   "SHA/SHA_Weston/csv/2026-07-18_to_2026-10-15_sessions.csv")) |> 
+  mutate(
+    month = lubridate::month(session_start),
+    building = "Weston"
+  )  |> 
+  select(building, month, everything())
+
 ## NAHA buildings
-ashland <- read_csv(file.path(data_path, 
-                              "NAHA/NAHA_Ashland_Spring/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+ashland_raw <- read_csv(file.path(data_path, 
+                              "NAHA/NAHA_Ashland_Spring/csv/2026-07-18_to_2026-10-15_sessions.csv")) |> 
+  mutate(
+    month = lubridate::month(session_start),
+    building = "Ashland"
+  ) |> 
+  select(building, month, everything())
 
-greylock <- read_csv(file.path(data_path, 
-                               "NAHA/NAHA_Greylock/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+greylock_raw <- read_csv(file.path(data_path, 
+                               "NAHA/NAHA_Greylock/csv/2026-07-18_to_2026-10-15_sessions.csv")) |> 
+  mutate(
+    month = lubridate::month(session_start),
+    building = "Greylock"
+  ) |> 
+  select(building, month, everything())
 
-riverview <- read_csv(file.path(data_path, 
-                                "NAHA/NAHA_Riverview/csv/2026-07-18_to_2026-10-15_sessions.csv"))
+riverview_raw <- read_csv(file.path(data_path, 
+                                "NAHA/NAHA_Riverview/csv/2026-07-18_to_2026-10-15_sessions.csv")) |> 
+  mutate(
+    month = lubridate::month(session_start),
+    building = "Riverview"
+  ) |> 
+  select(building, month, everything())
+
+rapidtech <- rbind(properzi_raw, weston_raw, ashland_raw, greylock_raw, riverview_raw)
+
+rm(properzi_raw, weston_raw, ashland_raw, greylock_raw, riverview_raw)
+gc()
 ```
 
 # Number + % of units using free wifi
 - # of units that have ever connected
   - rapid_tech has this since launch date in "active_vlan_summary" (active + configured)
 - monthly usage trends, any trends from launch date on
-```{r}
+```{r, message=FALSE}
+#total connections from RapidTech
 
+##SHA buildings
+properzi_usage <- read_csv(file.path(data_path, "SHA/SHA_Properzi/csv/active_vlan_summary.csv")) |> 
+  mutate(usage_p = active_vlans/configured_vlans,
+         building = "Properzi")
+
+weston_usage <- read_csv(file.path(data_path, "SHA/SHA_Weston/csv/active_vlan_summary.csv")) |> 
+  mutate(usage_p = active_vlans/configured_vlans,
+         building = "Weston")
+
+## NAHA buildings
+ashland_usage <- read_csv(file.path(data_path, "NAHA/NAHA_Ashland_Spring/csv/active_vlan_summary.csv")) |> 
+  mutate(usage_p = active_vlans/configured_vlans,
+         building = "Ashland")
+
+greylock_usage <- read_csv(file.path(data_path, "NAHA/NAHA_Greylock/csv/active_vlan_summary.csv")) |> 
+  mutate(usage_p = active_vlans/configured_vlans,
+         building = "Greylock")
+
+riverview_usage <- read_csv(file.path(data_path, "NAHA/NAHA_Riverview/csv/active_vlan_summary.csv")) |> 
+  mutate(usage_p = active_vlans/configured_vlans,
+         building = "Riverview")
+
+usage <- rbind(properzi_usage, weston_usage, ashland_usage, greylock_usage, riverview_usage) |>
+  filter(category == "Total") |> 
+  select(building, everything())
+
+rm(properzi_usage, weston_usage, ashland_usage, greylock_usage, riverview_usage)
+gc()
 ```
+
+
+```{r}
+# calculated total connections
+
+usage_calc <- rapidtech |> 
+  mutate(
+    #created first use in data date
+    report_start = str_sub((min(session_start)), 1, 10),
+    #created last use in data date
+    report_end = str_sub((max(session_end)), 1, 10)
+  ) |> 
+  select(building, report_start, report_end, vlan) |> 
+  distinct() |> 
+  group_by(building) |> 
+  mutate(active_vlans = n()) |> 
+  select(-c(vlan)) |> 
+  distinct()
+```
+calculated usage comes out 1 higher than rapidtech estimated usage, subtracting one to match but could ask RapidTech why this is
+
 
 # Number of devices per VLAN
 - monthly average, median, max
